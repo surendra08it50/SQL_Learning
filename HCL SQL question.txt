@@ -1,0 +1,110 @@
+TABLE 1: 
+ 
+ID, 1B, 2B, 3B
+1,  100, 300, 400
+2,  100, 201, 400
+ 
+ 
+REF
+NAME, 1B1, 1B2, 1B3,  2B1, 2B2, 2b3  3B1 3B2 3B3
+XYZ,  100, ' ', ' ',  200, 201, 300  400 ''  '' 
+
+there are two tables, from table1 corresponding to every column there are three columns in ref table.
+here row1 of first table 1B column has value 100, this is matching with first row of ref table 1B1 column. in the same way tabl1 2B column second row data is 201 which will match with any column value of 2nd row of ref table.
+
+can we join two table and get ID and NAME column
+
+Yes ✅ you can join these two tables — but since each column in TABLE1 (1B, 2B, 3B) maps to multiple columns in REF (1B1–1B3, 2B1–2B3, 3B1–3B3), a normal direct join won’t work.
+
+You need OR-based join logic or a better approach: UNPIVOT the REF table.
+
+📌 Understanding the Mapping
+TABLE1
+ID	1B	2B	3B
+1	100	300	400
+2	100	201	400
+REF
+NAME	1B1	1B2	1B3	2B1	2B2	2B3	3B1	3B2	3B3
+XYZ	100			200	201	300	400		
+🎯 Requirement
+
+Match:
+
+TABLE1.1B with (1B1,1B2,1B3)
+
+TABLE1.2B with (2B1,2B2,2B3)
+
+TABLE1.3B with (3B1,3B2,3B3)
+
+Return:
+
+ID, NAME
+
+✅ Solution 1 — Simple OR Join (Works but not scalable)
+SELECT DISTINCT t.ID, r.NAME
+FROM table1 t
+JOIN ref r
+ON (
+       t.1B IN (r.1B1, r.1B2, r.1B3)
+    OR t.2B IN (r.2B1, r.2B2, r.2B3)
+    OR t.3B IN (r.3B1, r.3B2, r.3B3)
+)
+
+
+✔ Easy
+❌ Not good if columns increase
+❌ Hard to maintain
+
+✅ Solution 2 — Best Practice (UNPIVOT REF Table)
+
+Convert REF from wide to long format.
+
+Step 1: Normalize REF
+WITH ref_unpivot AS (
+    SELECT NAME, '1B' AS col_type, 1B1 AS value FROM ref
+    UNION ALL
+    SELECT NAME, '1B', 1B2 FROM ref
+    UNION ALL
+    SELECT NAME, '1B', 1B3 FROM ref
+    
+    UNION ALL
+    SELECT NAME, '2B', 2B1 FROM ref
+    UNION ALL
+    SELECT NAME, '2B', 2B2 FROM ref
+    UNION ALL
+    SELECT NAME, '2B', 2B3 FROM ref
+    
+    UNION ALL
+    SELECT NAME, '3B', 3B1 FROM ref
+    UNION ALL
+    SELECT NAME, '3B', 3B2 FROM ref
+    UNION ALL
+    SELECT NAME, '3B', 3B3 FROM ref
+)
+
+Step 2: Unpivot TABLE1 also
+, table1_unpivot AS (
+    SELECT ID, '1B' AS col_type, 1B AS value FROM table1
+    UNION ALL
+    SELECT ID, '2B', 2B FROM table1
+    UNION ALL
+    SELECT ID, '3B', 3B FROM table1
+)
+
+Step 3: Join
+SELECT DISTINCT t.ID, r.NAME
+FROM table1_unpivot t
+JOIN ref_unpivot r
+    ON t.col_type = r.col_type
+   AND t.value = r.value
+WHERE r.value IS NOT NULL
+
+🔥 Output
+ID	NAME
+1	XYZ
+2	XYZ
+💡 Interview-Level Answer
+
+If asked in interview:
+
+“Since mapping is column-group based (1B→1B1-1B3), I would normalize both tables using UNPIVOT and then join on column_type and value. This makes the solution scalable and maintainable.”
